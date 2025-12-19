@@ -22,7 +22,7 @@ const signUp = async(req, res) => {
       mobile,
       role,
     });
-    const token = await genToken(user._id);
+    const token = await genToken(UserData._id);
     req.cookies("token", token, {
            secure: false,
            sameSite: "strict",
@@ -34,3 +34,43 @@ const signUp = async(req, res) => {
     return res.status(500).json(`signup failed ${error.message}`);
   }
 };
+
+const signIn = async(req, res) => {
+  try {
+    const {  email, password } = req.body;
+    const UserData = await User.findOne({ email });
+    if (!UserData) {
+      return res.status(400).json({ message: "User Does Not exists" });
+    }
+    
+    const isPasswordMatched = await bcrypt.compare(password, UserData.password);
+    if (!isPasswordMatched) {
+      return res.status(400).json({ message: "Incorrect Password" });
+    }
+    const token = await genToken(UserData._id);
+    req.cookies("token", token, {
+           secure: false,
+           sameSite: "strict",
+           httpOnly: true,
+           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    return res.status(200).json(UserData);
+  } catch (error) {
+    return res.status(500).json(`signup failed ${error.message}`);
+  }
+};
+
+const signOut = async(req, res) => {
+  try {
+    res.clearCookie("token", {
+      secure: false,
+      sameSite: "strict",
+      httpOnly: true,
+    });
+    return res.status(200).json({ message: "Signout Successfully" });
+  } catch (error) {
+    return res.status(500).json(`Signout failed ${error.message}`);
+  }
+};
+
+export { signUp, signIn, signOut };
