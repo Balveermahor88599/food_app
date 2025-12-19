@@ -1,5 +1,6 @@
 import User from "../models/user.models";
 import bcrypt from "bcryptjs";
+import genToken from "../utils/token";
 const signUp = async(req, res) => {
   try {
     const { Fullname, email, password, mobile, role } = req.body;
@@ -21,6 +22,7 @@ const signUp = async(req, res) => {
       mobile,
       role,
     });
+    const token = await genToken(user._id);
     await user.save();
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
