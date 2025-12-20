@@ -1,75 +1,117 @@
-import User from "../models/user.models";
+import User from "../models/user.models.js";
 import bcrypt from "bcryptjs";
-import genToken from "../utils/token";
-const signUp = async(req, res) => {
+import genToken from "../utils/token.js";
+
+/* ===================== SIGN UP ===================== */
+const signUp = async (req, res) => {
   try {
     const { Fullname, email, password, mobile, role } = req.body;
-    const UserData = await User.findOne({ email });
-    if (UserData) {
+
+    // check existing user
+    let user = await User.findOne({ email });
+    if (user) {
       return res.status(400).json({ message: "User already exists" });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+
+    // validations
+    if (!password || password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters long" });
     }
-    if (mobile.length < 10) {
-      return res.status(400).json({ message: "Mobile number must be at least 10 digits" });
+
+    if (!mobile || mobile.length < 10) {
+      return res
+        .status(400)
+        .json({ message: "Mobile number must be at least 10 digits" });
     }
-    const hassedPassword = await bcrypt.hash(password, 10);
-    UserData = await User.create({
+
+    // hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // create user
+    user = await User.create({
       Fullname,
       email,
-      password: hassedPassword,
+      password: hashedPassword,
       mobile,
       role,
     });
-    const token = await genToken(UserData._id);
-    req.cookies("token", token, {
-           secure: false,
-           sameSite: "strict",
-           httpOnly: true,
-           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+
+    // generate token
+    const token = genToken(user._id);
+
+    // set cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: false, // true when https
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    return res.status(201).json(UserData);
+
+    // remove password from response
+    const { password: _, ...userWithoutPassword } = user._doc;
+
+    return res.status(201).json(userWithoutPassword);
   } catch (error) {
-    return res.status(500).json(`signup failed ${error.message}`);
+    return res
+      .status(500)
+      .json({ message: `Signup failed: ${error.message}` });
   }
 };
 
-const signIn = async(req, res) => {
+/* ===================== SIGN IN ===================== */
+const signIn = async (req, res) => {
   try {
-    const {  email, password } = req.body;
-    const UserData = await User.findOne({ email });
-    if (!UserData) {
-      return res.status(400).json({ message: "User Does Not exists" });
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "User does not exist" });
     }
-    
-    const isPasswordMatched = await bcrypt.compare(password, UserData.password);
+
+    const isPasswordMatched = await bcrypt.compare(
+      password,
+      user.password
+    );
+
     if (!isPasswordMatched) {
-      return res.status(400).json({ message: "Incorrect Password" });
+      return res.status(400).json({ message: "Incorrect password" });
     }
-    const token = await genToken(UserData._id);
-    req.cookies("token", token, {
-           secure: false,
-           sameSite: "strict",
-           httpOnly: true,
-           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+
+    const token = genToken(user._id);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    return res.status(200).json(UserData);
+
+    const { password: _, ...userWithoutPassword } = user._doc;
+
+    return res.status(200).json(userWithoutPassword);
   } catch (error) {
-    return res.status(500).json(`signup failed ${error.message}`);
+    return res
+      .status(500)
+      .json({ message: `Signin failed: ${error.message}` });
   }
 };
 
-const signOut = async(req, res) => {
+/* ===================== SIGN OUT ===================== */
+const signOut = async (req, res) => {
   try {
     res.clearCookie("token", {
-      secure: false,
-      sameSite: "strict",
       httpOnly: true,
+      sameSite: "strict",
+      secure: false,
     });
-    return res.status(200).json({ message: "Signout Successfully" });
+
+    return res.status(200).json({ message: "Signout successfully" });
   } catch (error) {
-    return res.status(500).json(`Signout failed ${error.message}`);
+    return res
+      .status(500)
+      .json({ message: `Signout failed: ${error.message}` });
   }
 };
 
