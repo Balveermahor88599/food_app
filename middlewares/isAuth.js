@@ -1,18 +1,21 @@
-// import React from 'react'
+import React from 'react'
 
-// const isAuth =async(req,res,next) => {
-//   try {
-//     const token = req.cookies.token;
-//     if (!token) {
-//       return res.status(401).json({ success: false, message: "Unauthorized access" });
-//     }
+const isAuth =async(req,res,next) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) {
+      return res.status(401).json({ success: false, message: "Unauthorized access" });
+    }
 
-//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-//     req.user = decoded;
-//     next();
-//   } catch (error) {
-//     return res.status(401).json({ success: false, message: "Invalid token" });
-//   }
-// }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded) {
+      return res.status(401).json({ success: false, message: "token not verified" });
+    }
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: "Invalid token" });
+  }
+}
 
-// export default isAuth
+export default isAuth
