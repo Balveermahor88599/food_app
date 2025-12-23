@@ -4,17 +4,26 @@ import genToken from "../utils/token.js";
 import jwt from "jsonwebtoken"; // Ye line add karein
 import nodemailer from "nodemailer"; // Agar nodemailer use kar rahe hain toh ise bhi
 
-/* ===================== SIGN UP ===================== */
-// 
-/* ===================== SIGN UP ===================== */
+
+// /* ===================== SIGN UP ===================== */
 const signUp = async (req, res) => {
   try {
     const { Fullname, email, password, mobile, role } = req.body;
 
-    // 1. Check existing user
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ success: false, message: "Email already exists" });
+    // 1. Check existing user (Email OR Mobile)
+    // Hum check kar rahe hain ki kya koi aisa user hai jiska email YA mobile match karta ho
+    let existingUser = await User.findOne({ 
+      $or: [ { email: email }, { mobile: mobile } ] 
+    });
+
+    if (existingUser) {
+      // Specifically check karein ki problem email mein hai ya mobile mein
+      if (existingUser.email === email) {
+        return res.status(400).json({ success: false, message: "Email already exists" });
+      }
+      if (existingUser.mobile === mobile) {
+        return res.status(400).json({ success: false, message: "Mobile number already registered" });
+      }
     }
 
     // 2. Manual Validations
@@ -26,7 +35,7 @@ const signUp = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 4. Create user
-    user = await User.create({
+    const user = await User.create({
       Fullname,
       email,
       password: hashedPassword,
@@ -45,12 +54,14 @@ const signUp = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    // 7. Success Response (Frontend ke liye zaroori)
-    const { password: _, ...userWithoutPassword } = user._doc;
+    // 7. Success Response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
     return res.status(201).json({
       success: true,
       message: "Signup successful",
-      user: userWithoutPassword
+      user: userResponse
     });
 
   } catch (error) {
@@ -59,43 +70,7 @@ const signUp = async (req, res) => {
   }
 };
 
-// /* ===================== SIGN IN ===================== */
-// const signIn = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
 
-//     const user = await User.findOne({ email });
-//     if (!user) {
-//       return res.status(400).json({ message: "User does not exist" });
-//     }
-
-//     const isPasswordMatched = await bcrypt.compare(
-//       password,
-//       user.password
-//     );
-
-//     if (!isPasswordMatched) {
-//       return res.status(400).json({ message: "Incorrect password" });
-//     }
-
-//     const token = genToken(user._id);
-
-//     res.cookie("token", token, {
-//       httpOnly: true,
-//       sameSite: "strict",
-//       secure: false,
-//       maxAge: 7 * 24 * 60 * 60 * 1000,
-//     });
-
-//     const { password: _, ...userWithoutPassword } = user._doc;
-
-//     return res.status(200).json(userWithoutPassword);
-//   } catch (error) {
-//     return res
-//       .status(500)
-//       .json({ message: `Signin failed: ${error.message}` });
-//   }
-// };
 
 /* ===================== SIGN IN ===================== */
 const signIn = async (req, res) => {
@@ -248,10 +223,74 @@ export const resetPassword = async (req, res) => {
     console.error("Reset Password Error:", error);
     return res.status(400).json({ 
       success: false, 
-      message: "Link invalid hai ya expire ho chuka hai." 
+      message: "Link invalid hai ya expire ho chuka hai."  
     });
   }
 };
 
+/* ===================== GOOGLE SIGN IN ===================== */
+const googleSignIn = async (req, res) => {
+  try {
+    const { email, Fullname, profilePic, role } = req.body; 
 
-export { signUp, signIn, signOut };
+    // 1. User check karein
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // 2. Naya user banate waqt mobile check
+      // Agar '0000000000' pehle se DB mein hai, toh ye crash karega (Unique constraint ki wajah se)
+      // Isliye Random String ya Email ka hi part mobile mein temporarily daal sakte hain
+      const tempMobile = `${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+
+      const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+      const hashedPassword = await bcrypt.hash(generatedPassword, 10);
+      
+      user = await User.create({
+        email,
+        Fullname,
+        password: hashedPassword,
+        profilePic: profilePic || "", 
+        role: role || "user", 
+        mobile: tempMobile // Har Google user ke liye unique temporary ID
+      });
+    }
+
+    // 3. Token & Cookie (Aapka logic sahi hai)
+    const token = genToken(user._id);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production", 
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Welcome back, ${user.Fullname}`,
+      user: {
+        _id: user._id,
+        email: user.email,
+        Fullname: user.Fullname,
+        role: user.role, // Purana role hi rahega agar account pehle se tha
+        profilePic: user.profilePic || profilePic
+      }
+    });
+
+  } catch (error) {
+    console.error("Google Sign In Error:", error);
+    // Unique key error handling (agar same mobile number dobara aaye)
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: "This account info conflicts with an existing user." });
+    }
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Sabhi functions ko ek saath niche export karein
+export { 
+  signUp, 
+  signIn, 
+  signOut, 
+  googleSignIn 
+};
