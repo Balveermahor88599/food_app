@@ -22,6 +22,7 @@ app.use(cookieParser());
 
 // routes
 app.use("/api/auth", router);
+app.use("/api/user", userRouter);
 
 // start server only after DB connection
 const startServer = async () => {
