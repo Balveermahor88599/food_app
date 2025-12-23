@@ -1,17 +1,20 @@
+// 1. Add this import (check your actual file path/name for the User model) 
+import User from "../models/user.models.js";
+
 export const getCurrentUser = async (req, res) => {
   try {
-    // 1. Check if user exists on the request object (from middleware)
-    if (!req.user || !req.user._id) {
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId) {
       return res.status(401).json({ 
         success: false, 
-        message: "Unauthorized access: No user found in request" 
+        message: "Unauthorized access: No valid user ID in token" 
       });
     }
 
-    // 2. Fetch user from DB and exclude password
-    const user = await User.findById(req.user._id).select("-password");
+    // 2. Now "User" will be defined here
+    const user = await User.findById(userId).select("-password");
 
-    // 3. Check if user still exists in the database
     if (!user) {
       return res.status(404).json({ 
         success: false, 
@@ -25,7 +28,8 @@ export const getCurrentUser = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Get Current User Error:", error.message);
+    // This is where you were seeing the "User is not defined" log
+    console.error("Get Current User Error:", error.message); 
     return res.status(500).json({ 
       success: false, 
       message: "Internal server error" 

@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
 import router from "./routes/auth.routes.js";
 import cors from "cors";
+import userRouter from "./routes/user.routes.js";
 
 
 const app = express();
