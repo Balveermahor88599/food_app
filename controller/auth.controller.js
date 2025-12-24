@@ -123,19 +123,26 @@ const signIn = async (req, res) => {
   }
 };
 /* ===================== SIGN OUT ===================== */
-const signOut = async (req, res) => {
+export const signOut = async (req, res) => {
   try {
+    // Cookie clear karte waqt options wahi rakhein jo login ke waqt the
     res.clearCookie("token", {
       httpOnly: true,
       sameSite: "strict",
-      secure: false,
+      secure: false, // Localhost ke liye false
     });
 
-    return res.status(200).json({ message: "Signout successfully" });
+    // Frontend logic ke liye 'success: true' bhejna compulsory hai
+    return res.status(200).json({ 
+      success: true, 
+      message: "Signout successfully ✅" 
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: `Signout failed: ${error.message}` });
+    console.error("Signout Error:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: `Signout failed: ${error.message}` 
+    });
   }
 };
 
@@ -291,6 +298,5 @@ const googleSignIn = async (req, res) => {
 export { 
   signUp, 
   signIn, 
-  signOut, 
   googleSignIn 
 };
